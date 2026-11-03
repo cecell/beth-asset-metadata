@@ -83,6 +83,8 @@ static void test_dds() {
     CHECK(read_dds(b.data(), b.size(), i) == Status::Ok && i.format == DdsFormat::R8G8);
     b = dds(128, 128, 1, "DX10", 9999);
     CHECK(read_dds(b.data(), b.size(), i) == Status::Ok && i.format == DdsFormat::Other);
+    b = dds(128, 128, 1, "$\0\0\0");  // numeric FourCC 36 = D3DFMT_A16B16G16R16
+    CHECK(read_dds(b.data(), b.size(), i) == Status::Ok && i.format == DdsFormat::R16G16B16A16 && i.bitsPerPixel == 64);
 
     // Cubemaps both ways.
     b = dds(64, 64, 1, "DXT1", 0, 0x200);

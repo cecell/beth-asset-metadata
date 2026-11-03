@@ -63,7 +63,11 @@ CMake: `FetchContent` or `add_subdirectory` this repo and link
   when SE geometry is present, LE when only legacy geometry is, "either"
   for a Skyrim header with neither. BS version 130 is Fallout 4 and some
   SSE tools; it is accepted as a Skyrim header but is not evidence of SE.
-- **Audio.** xWMA duration comes from the last `dpds` entry (cumulative
+- **Audio.** FUZ payloads are usually xWMA, but plain WAV happens too: of
+  280,715 loose FUZ files on one modded install, 569 wrapped PCM or IEEE
+  float WAV. Files that are not RIFF at all (a mod shipped MP3s named
+  `.wav`) report `NotRecognized`; the game cannot play those either.
+- **Audio, duration.** xWMA duration comes from the last `dpds` entry (cumulative
   decoded PCM bytes), which is exact; `fact` is used next, then data size
   over average byte rate (exact for PCM WAV). `durationSource` says which.
   FUZ = `FUZE`, u32 version, u32 lip size, lip block, then a complete RIFF

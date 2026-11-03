@@ -33,6 +33,7 @@ struct DxgiDesc {
 constexpr DxgiDesc kDxgi[] = {
     {2, DdsFormat::R32G32B32A32F, 0, 128, false, true},
     {10, DdsFormat::R16G16B16A16F, 0, 64, false, true},
+    {11, DdsFormat::R16G16B16A16, 0, 64, false, true},
     {28, DdsFormat::R8G8B8A8, 0, 32, false, true},
     {29, DdsFormat::R8G8B8A8, 0, 32, true, true},
     {49, DdsFormat::R8G8, 0, 16, false, false},
@@ -77,8 +78,9 @@ void classify_fourcc(const char* cc, DdsInfo& o) noexcept {
             o.hasAlpha = e.alpha;
             return;
         }
-    // D3DFMT numeric FourCCs for the float formats.
+    // D3DFMT numeric FourCCs for the 16-bit-per-channel and float formats.
     const uint32_t n = rd32(reinterpret_cast<const uint8_t*>(cc));
+    if (n == 36) { o.format = DdsFormat::R16G16B16A16; o.bitsPerPixel = 64; o.hasAlpha = true; return; }
     if (n == 113) { o.format = DdsFormat::R16G16B16A16F; o.bitsPerPixel = 64; o.hasAlpha = true; return; }
     if (n == 116) { o.format = DdsFormat::R32G32B32A32F; o.bitsPerPixel = 128; o.hasAlpha = true; return; }
     o.format = DdsFormat::Other;
@@ -136,6 +138,7 @@ const char* to_string(DdsFormat f) noexcept {
         case DdsFormat::B5G6R5: return "B5G6R5";
         case DdsFormat::B5G5R5A1: return "B5G5R5A1";
         case DdsFormat::B4G4R4A4: return "B4G4R4A4";
+        case DdsFormat::R16G16B16A16: return "R16G16B16A16";
         case DdsFormat::R16G16B16A16F: return "R16G16B16A16_FLOAT";
         case DdsFormat::R32G32B32A32F: return "R32G32B32A32_FLOAT";
         case DdsFormat::Other: return "other";

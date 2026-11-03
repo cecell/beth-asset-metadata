@@ -42,7 +42,7 @@ enum class DdsFormat {
     R8G8B8A8, B8G8R8A8, B8G8R8X8, R8G8B8, B8G8R8,
     R8, R8G8, A8, L8,
     B5G6R5, B5G5R5A1, B4G4R4A4,
-    R16G16B16A16F, R32G32B32A32F,
+    R16G16B16A16, R16G16B16A16F, R32G32B32A32F,
     Other,  // recognised header, format not in this list; see fourcc / dxgiFormat / bitsPerPixel
 };
 const char* to_string(DdsFormat f) noexcept;
