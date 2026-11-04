@@ -10,6 +10,7 @@ CMake target `asset::metadata`, namespace `asset`.
 | `.tga` | width, height, bits per pixel, alpha bits, RLE, color-mapped, grayscale, origin | 18 bytes |
 | `.nif` | version line, binary version, user version, BS version, block count, block-type table, per-block type index, SE vs legacy geometry, Skyrim LE/SE engine guess | 64 KiB (more for huge meshes) |
 | `.nif` textures | every texture path a Skyrim mesh names (texture sets, effect shaders) | the whole file |
+| `.lip` | version, unit count (header only; the keyframe stream is not decoded) | 16 bytes |
 | `.wav` `.xwm` `.fuz` | container and payload, codec, channels, sample rate, bits, bit rate, data size, duration, FUZ lip block size | 64 KiB |
 
 Every reader takes a byte buffer, so it works on a file prefix or on bytes
@@ -81,6 +82,12 @@ CMake: `FetchContent` or `add_subdirectory` this repo and link
   every other block is skipped by its recorded size. Paths are returned as
   stored, so normalise them yourself (case, slashes, a missing `textures\`
   prefix). Needs the whole file: a cut file is `Truncated`.
+- **LIP.** No public specification exists; the header was measured on
+  14,837 loose files and the LIP blocks inside FUZ files. u32 version (1),
+  u32 size field (always `132 * units + 28`), u32 constant 13, then a u16
+  that usually repeats the unit count. The size field is authoritative (one
+  file disagrees with the u16). The keyframe stream is not decoded; no
+  duration or voice-line identity is stored (that is in the file name).
 - **Audio.** FUZ payloads are usually xWMA, but plain WAV happens too: of
   280,715 loose FUZ files on one modded install, 569 wrapped PCM or IEEE
   float WAV. Files that are not RIFF at all (a mod shipped MP3s named

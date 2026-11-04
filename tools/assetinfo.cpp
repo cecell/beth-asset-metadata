@@ -31,7 +31,7 @@ std::string lower_ext(const std::string& name) {
 }
 
 bool is_asset_ext(const std::string& e) {
-    return e == ".dds" || e == ".tga" || e == ".nif" || e == ".wav" || e == ".xwm" || e == ".fuz";
+    return e == ".dds" || e == ".tga" || e == ".nif" || e == ".wav" || e == ".xwm" || e == ".fuz" || e == ".lip";
 }
 
 void print_dds(const DdsInfo& i) {
@@ -73,6 +73,12 @@ int cmd_file(const fs::path& p) {
         TgaInfo i;
         s = probe_tga(p, i);
         if (s == Status::Ok) print_tga(i);
+    } else if (ext == ".lip") {
+        std::vector<uint8_t> buf;
+        LipInfo i;
+        s = read_prefix(p, 64, buf);
+        if (s == Status::Ok) s = read_lip(buf.data(), buf.size(), i);
+        if (s == Status::Ok) std::printf("lip  version %u  units %u  field8 %u  header u16 %u\n", i.version, i.units, i.field8, i.headerUnits);
     } else {
         switch (detect(head.data(), head.size())) {
             case Kind::Dds: { DdsInfo i; s = probe_dds(p, i); if (s == Status::Ok) print_dds(i); break; }
@@ -139,6 +145,13 @@ void check_buffer(const std::string& ext, const uint8_t* d, size_t n, const std:
             TgaInfo i;
             s = read_tga(d, n, i);
             if (s == Status::Ok) ++t.notes[std::to_string(i.bitsPerPixel) + " bpp" + (i.rle ? " rle" : "")];
+        }
+    } else if (ext == ".lip") {
+        LipInfo i;
+        s = read_lip(d, n, i);
+        if (s == Status::Ok) {
+            if (i.field8 != 13) note(t, "field8 " + std::to_string(i.field8), where);
+            if (i.headerUnits != i.units) ++t.notes["header u16 differs from size field"];
         }
     } else if (ext == ".nif") {
         NifInfo i;

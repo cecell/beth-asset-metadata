@@ -321,6 +321,20 @@ static void test_nif_geometry() {
     CHECK(body.shapes == 1 && body.shapesUnread == 1 && body.vertices == 0 && body.triangles == 0);
 }
 
+static void test_lip() {
+    Bytes b;
+    put32(b, 1); put32(b, 132 * 23 + 28); put32(b, 13); put16(b, 23); put16(b, 3);
+    LipInfo i;
+    CHECK(read_lip(b.data(), b.size(), i) == Status::Ok && i.units == 23 && i.field8 == 13 && i.headerUnits == 23);
+    b[12] = 0; b[13] = 1;  // the u16 disagrees: the size field wins
+    CHECK(read_lip(b.data(), b.size(), i) == Status::Ok && i.units == 23 && i.headerUnits == 256);
+    patch32(b, 4, 100);    // not 132 * n + 28
+    CHECK(read_lip(b.data(), b.size(), i) == Status::Corrupt);
+    patch32(b, 0, 2);
+    CHECK(read_lip(b.data(), b.size(), i) == Status::NotRecognized);
+    CHECK(read_lip(b.data(), 15, i) == Status::Truncated);
+}
+
 static void test_nif_textures() {
     Bytes b = textured_nif();
     std::vector<NifTexture> t;
@@ -526,6 +540,7 @@ int main() {
     test_nif_skin_strips();
     test_nif_geometry();
     test_audio();
+    test_lip();
     test_hostile();
     if (g_failures) {
         std::fprintf(stderr, "%d failure(s)\n", g_failures);

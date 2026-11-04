@@ -187,6 +187,23 @@ struct AudioInfo {
 constexpr size_t kAudioProbeBytes = size_t{64} << 10;
 Status read_audio(const uint8_t* data, size_t len, AudioInfo& out) noexcept;
 
+// ------------------------------------------------------------------ LIP
+
+// Skyrim lip-sync data (.lip, and the block inside a FUZ: AudioInfo::lipBytes
+// bytes after the 12-byte FUZE header). Only the header is understood; the
+// keyframe stream is not decoded, nothing in the file names the voice line
+// (that is the file name), and no duration is stored. Measured on 14,837
+// loose files; no magic exists, so pass only .lip data.
+struct LipInfo {
+    uint32_t version = 0;      // always 1
+    uint32_t sizeField = 0;    // 132 * units + 28
+    uint32_t field8 = 0;       // always 13 in every file seen (meaning unknown)
+    uint32_t units = 0;        // from sizeField; grows with the line's length (unit unknown)
+    uint16_t headerUnits = 0;  // the u16 at offset 12, usually == units (diagnostic only)
+    uint64_t bytes = 0;        // input length
+};
+Status read_lip(const uint8_t* data, size_t len, LipInfo& out) noexcept;
+
 // ---------------------------------------------------------------- files
 
 // Reads up to maxBytes from the start of the file, sharing read/write/delete.

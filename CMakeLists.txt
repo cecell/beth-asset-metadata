@@ -11,6 +11,7 @@ add_library(asset_metadata STATIC
     src/nif.cpp
     src/nif_textures.cpp
     src/audio.cpp
+    src/lip.cpp
     src/file.cpp)
 add_library(asset::metadata ALIAS asset_metadata)
 target_include_directories(asset_metadata PUBLIC
