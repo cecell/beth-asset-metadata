@@ -235,6 +235,51 @@ static Bytes textured_nif() {
     return b;
 }
 
+// A bs 83 NIF with one NiSkinPartition block: one partition, `strips` strips.
+static Bytes skinned_nif(uint16_t strips) {
+    Bytes part;
+    put32(part, 1);                                   // partitions
+    for (uint16_t v : {uint16_t(3), uint16_t(1), uint16_t(1), strips, uint16_t(1)}) put16(part, v);
+    put16(part, 0);                                   // bones
+    put8(part, 1); for (int i = 0; i < 3; ++i) put16(part, static_cast<uint16_t>(i));  // vertex map
+    put8(part, 1); for (int i = 0; i < 3; ++i) put32(part, 0x3F800000);               // weights
+    for (uint16_t s = 0; s < strips; ++s) put16(part, 3);                              // strip lengths
+    put8(part, 1); for (int i = 0; i < (strips ? 3 * strips : 3); ++i) put16(part, static_cast<uint16_t>(i % 3));
+    put8(part, 1); for (int i = 0; i < 3; ++i) put8(part, 0);                          // bone indices
+    put8(part, 0); put8(part, 0);                                                      // LOD level, Global VB
+    Bytes b;
+    const std::string line = "Gamebryo File Format, Version 20.2.0.7\n";
+    b.insert(b.end(), line.begin(), line.end());
+    put32(b, 0x14020007); put8(b, 1); put32(b, 12); put32(b, 3);
+    put32(b, 83);
+    short_string(b, "a"); short_string(b, "p"); short_string(b, "e");
+    put16(b, 3);
+    sized_string(b, "NiNode"); sized_string(b, "NiTriShape"); sized_string(b, "NiSkinPartition");
+    put16(b, 0); put16(b, 1); put16(b, 2);
+    put32(b, 4); put32(b, 4); put32(b, static_cast<uint32_t>(part.size()));
+    put32(b, 0); put32(b, 0); put32(b, 0);
+    put32(b, 0); put32(b, 0);  // NiNode and NiTriShape bodies (not read)
+    b.insert(b.end(), part.begin(), part.end());
+    return b;
+}
+
+static void test_nif_skin_strips() {
+    NifInfo h;
+    NifBody body;
+    Bytes b = skinned_nif(0);
+    CHECK(read_nif(b.data(), b.size(), h) == Status::Ok && h.engine == NifEngine::SkyrimEither);
+    CHECK(read_nif_body(b.data(), b.size(), body) == Status::Ok && !body.skinStrips);
+    CHECK(nif_engine(h, body) == NifEngine::SkyrimEither);
+    b = skinned_nif(2);
+    CHECK(read_nif(b.data(), b.size(), h) == Status::Ok && h.engine == NifEngine::SkyrimEither);  // the header cannot see it
+    CHECK(read_nif_body(b.data(), b.size(), body) == Status::Ok && body.skinStrips);
+    CHECK(nif_engine(h, body) == NifEngine::SkyrimLe);
+    for (size_t k = 0; k < b.size(); ++k) {  // cut files: a status, never a crash
+        NifBody p;
+        read_nif_body(b.data(), k, p);
+    }
+}
+
 static void test_nif_textures() {
     Bytes b = textured_nif();
     std::vector<NifTexture> t;
@@ -275,7 +320,11 @@ static void test_nif() {
     CHECK(nif_version_string(0x14020007) == "20.2.0.7");
 
     b = nif(0x14020007, 12, 100, {"NiNode", "NiTriShape", "NiTriStrips"}, {0, 1, 2});
-    CHECK(read_nif(b.data(), b.size(), i) == Status::Ok && i.engine == NifEngine::SkyrimLe && !i.seGeometry && i.legacyGeometry);
+    CHECK(read_nif(b.data(), b.size(), i) == Status::Ok && i.engine == NifEngine::SkyrimLe && !i.seGeometry && i.legacyGeometry &&
+          i.stripGeometry);
+    b = nif(0x14020007, 12, 83, {"NiNode", "NiTriShape", "NiTriShapeData"}, {0, 1, 2});  // LE mesh SE loads as is
+    CHECK(read_nif(b.data(), b.size(), i) == Status::Ok && i.engine == NifEngine::SkyrimEither && i.legacyGeometry &&
+          !i.stripGeometry);
     b = nif(0x14020007, 12, 83, {"NiNode"}, {0});
     CHECK(read_nif(b.data(), b.size(), i) == Status::Ok && i.engine == NifEngine::SkyrimEither);
     b = nif(0x14020007, 12, 100, {"NiNode", "BSTriShape"}, {0, 1});  // vanilla SSE: bs 100 but SE geometry
@@ -431,6 +480,7 @@ int main() {
     test_tga();
     test_nif();
     test_nif_textures();
+    test_nif_skin_strips();
     test_audio();
     test_hostile();
     if (g_failures) {

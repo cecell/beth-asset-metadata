@@ -91,11 +91,16 @@ Status read_tga(const uint8_t* data, size_t len, TgaInfo& out) noexcept;
 
 // ------------------------------------------------------------------ NIF
 
-// Which Skyrim the mesh was built for. The header alone cannot tell: vanilla
-// SSE meshes carry BS version 100 like LE. The geometry block types decide:
-// the BSTriShape family exists only in SE, NiTriShape/NiTriStrips is the
-// old style that SE still loads. A Skyrim header with neither (collision,
-// nodes only) is SkyrimEither.
+// Which Skyrim the mesh works in, decided the way Cathedral Assets
+// Optimizer's "necessary" mesh fixes do (5.3.x, MeshesOptimizer::scan and
+// nifly's IsSSECompatible). The header cannot tell: vanilla SSE meshes carry
+// BS version 100 like LE. The geometry decides:
+//   SkyrimSe:     BSTriShape family present (LE has none of it);
+//   SkyrimLe:     NiTriStrips shapes, which SE cannot use (CAO converts them);
+//   SkyrimEither: NiTriShape without strips, or no geometry at all (nodes,
+//                 collision): both games load it unchanged.
+// Strips inside a skin partition also make a mesh LE-only; only the block
+// bodies show that (NifBody::skinStrips, nif_engine()).
 enum class NifEngine { Unknown, SkyrimLe, SkyrimSe, SkyrimEither };
 const char* to_string(NifEngine e) noexcept;
 
@@ -111,7 +116,8 @@ struct NifInfo {
     std::vector<uint16_t> blockTypeIndex;  // per block, index into blockTypes
     bool seGeometry = false;      // BSTriShape / BSDynamicTriShape / BSMeshLODTriShape / BSSubIndexTriShape present
     bool legacyGeometry = false;  // NiTriShape(Data) / NiTriStrips(Data) / bhkPackedNiTriStrips* present
-    NifEngine engine = NifEngine::Unknown;
+    bool stripGeometry = false;   // NiTriStrips / NiTriStripsData present (shapes, not collision)
+    NifEngine engine = NifEngine::Unknown;  // from the header's block types (see NifEngine)
 };
 
 std::string nif_version_string(uint32_t version);  // 0x14020007 -> "20.2.0.7"
@@ -131,6 +137,17 @@ struct NifTexture {
 };
 constexpr size_t kNifMaxBytes = size_t{64} << 20;  // probe_nif_textures refuses bigger files
 Status read_nif_textures(const uint8_t* data, size_t len, std::vector<NifTexture>& out) noexcept;
+
+// What the block bodies of a Skyrim mesh add: the texture paths (as
+// read_nif_textures) and whether any NiSkinPartition stores strips. Needs
+// the whole file.
+struct NifBody {
+    std::vector<NifTexture> textures;
+    bool skinStrips = false;  // a skin partition with strips: SE cannot use it (CAO converts it)
+};
+Status read_nif_body(const uint8_t* data, size_t len, NifBody& out) noexcept;
+// The engine from the header and the body together (skin strips => SkyrimLe).
+NifEngine nif_engine(const NifInfo& header, const NifBody& body) noexcept;
 
 // ---------------------------------------------------------------- audio
 

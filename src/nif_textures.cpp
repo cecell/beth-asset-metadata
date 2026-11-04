@@ -1,6 +1,7 @@
-// NIF texture paths: walks a Skyrim NIF's header to the block sizes, then
-// reads only the blocks that name textures. Everything else is skipped by
-// its recorded size, so other block layouts never matter.
+// NIF block bodies: walks a Skyrim NIF's header to the block sizes, then
+// reads only the blocks that name textures and the skin partitions (for
+// strips). Everything else is skipped by its recorded size, so other block
+// layouts never matter.
 // SPDX-License-Identifier: GPL-3.0-only
 #include "asset/metadata.hpp"
 
@@ -52,7 +53,33 @@ struct Cursor {
     }
 };
 
-Status parse(const uint8_t* d, size_t n, std::vector<NifTexture>& out) {
+// Whether any partition of a NiSkinPartition block stores strips
+// (nif.xml, 20.2.0.7: BS versions above 34 add LOD level and Global VB, SSE
+// (100) adds the shared vertex data up front and per-partition copies).
+bool SkinPartitionHasStrips(Cursor k, uint32_t bsVersion) {
+    const uint32_t partitions = k.u32();
+    if (bsVersion == 100) {
+        const uint32_t dataSize = k.u32();
+        k.skip(4 + 8);    // vertex size, vertex desc
+        k.skip(dataSize);  // vertex data
+    }
+    for (uint32_t p = 0; p < partitions && p < 4096 && !k.bad; ++p) {
+        const uint16_t vertices = k.u16(), triangles = k.u16(), bones = k.u16(), strips = k.u16(),
+                       weights = k.u16();
+        if (k.bad) return false;
+        if (strips > 0) return true;
+        k.skip(uint64_t{bones} * 2);
+        if (k.u8()) k.skip(uint64_t{vertices} * 2);            // vertex map
+        if (k.u8()) k.skip(uint64_t{vertices} * weights * 4);  // vertex weights
+        if (k.u8()) k.skip(uint64_t{triangles} * 6);           // faces (no strips here)
+        if (k.u8()) k.skip(uint64_t{vertices} * weights);      // bone indices
+        if (bsVersion > 34) k.skip(2);                         // LOD level, Global VB
+        if (bsVersion == 100) k.skip(8 + uint64_t{triangles} * 6);  // vertex desc, triangles copy
+    }
+    return false;
+}
+
+Status parse(const uint8_t* d, size_t n, NifBody& out) {
     const void* nl = std::memchr(d, '\n', std::min<size_t>(n, 128));
     if (!nl) return n < 128 ? Status::Truncated : Status::NotRecognized;
     Cursor c{d, n, static_cast<size_t>(static_cast<const uint8_t*>(nl) - d) + 1};
@@ -94,18 +121,20 @@ Status parse(const uint8_t* d, size_t n, std::vector<NifTexture>& out) {
             const uint32_t count = k.u32();
             for (uint32_t i = 0; i < count && i < 64 && !k.bad; ++i) {
                 std::string tex = k.sized(1024);
-                if (!k.bad && !tex.empty()) out.push_back({type, i, std::move(tex)});
+                if (!k.bad && !tex.empty()) out.textures.push_back({type, i, std::move(tex)});
             }
         } else if (type == "BSEffectShaderProperty" && bsVersion < 130) {
             k.skip(4);                      // name
             k.skip(uint64_t{k.u32()} * 4);  // extra data refs
             k.skip(4 + 8 + 16);             // controller, shader flags 1 and 2, UV offset and scale
             std::string source = k.sized(1024);
-            if (!k.bad && !source.empty()) out.push_back({type, 0, std::move(source)});
+            if (!k.bad && !source.empty()) out.textures.push_back({type, 0, std::move(source)});
             k.skip(4 + 16);                 // clamp, lighting influence, env map LOD, unused; falloff
             k.skip(16 + 4 + 4);             // emissive color and multiple, soft falloff depth
             std::string grey = k.sized(1024);
-            if (!k.bad && !grey.empty()) out.push_back({type, 1, std::move(grey)});
+            if (!k.bad && !grey.empty()) out.textures.push_back({type, 1, std::move(grey)});
+        } else if (type == "NiSkinPartition" && !out.skinStrips) {
+            out.skinStrips = SkinPartitionHasStrips(k, bsVersion);
         }
         off += sizes[b];
     }
@@ -114,19 +143,30 @@ Status parse(const uint8_t* d, size_t n, std::vector<NifTexture>& out) {
 
 }  // namespace
 
-Status read_nif_textures(const uint8_t* data, size_t len, std::vector<NifTexture>& out) noexcept {
-    out.clear();
+Status read_nif_body(const uint8_t* data, size_t len, NifBody& out) noexcept {
+    out = NifBody{};
+    Status s;
     try {
-        const Status s = parse(data, len, out);
-        if (s != Status::Ok) out.clear();
-        return s;
+        s = parse(data, len, out);
     } catch (const std::bad_alloc&) {
-        out.clear();
-        return Status::OutOfMemory;
+        s = Status::OutOfMemory;
     } catch (...) {
-        out.clear();
-        return Status::Corrupt;
+        s = Status::Corrupt;
     }
+    if (s != Status::Ok) out = NifBody{};
+    return s;
+}
+
+Status read_nif_textures(const uint8_t* data, size_t len, std::vector<NifTexture>& out) noexcept {
+    NifBody body;
+    const Status s = read_nif_body(data, len, body);
+    out = std::move(body.textures);
+    return s;
+}
+
+NifEngine nif_engine(const NifInfo& header, const NifBody& body) noexcept {
+    if (header.engine == NifEngine::SkyrimEither && body.skinStrips) return NifEngine::SkyrimLe;
+    return header.engine;
 }
 
 }  // namespace asset

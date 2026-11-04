@@ -19,8 +19,8 @@ constexpr uint32_t V(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept {
 }
 
 // Geometry block types that tell the two Skyrims apart. The BSTriShape
-// family was introduced with SE; the NiTri* family is the LE style, which
-// SE still loads (vanilla SSE ships meshes with NiTriStripsData blocks).
+// family was introduced with SE; the NiTri* family is the LE style. SE loads
+// NiTriShape, but not NiTriStrips (CAO's "necessary" fixes convert those).
 const char* const kSeGeometry[] = {"BSTriShape", "BSDynamicTriShape", "BSMeshLODTriShape", "BSSubIndexTriShape"};
 const char* const kLegacyGeometry[] = {"NiTriShape", "NiTriShapeData", "NiTriStrips", "NiTriStripsData",
                                        "bhkPackedNiTriStripsShape", "bhkPackedNiTriStripsData"};
@@ -145,12 +145,13 @@ Status parse(const uint8_t* d, size_t n, NifInfo& o) {
     for (const std::string& t : o.blockTypes) {
         for (const char* s : kSeGeometry) if (t == s) o.seGeometry = true;
         for (const char* s : kLegacyGeometry) if (t == s) o.legacyGeometry = true;
+        if (t == "NiTriStrips" || t == "NiTriStripsData") o.stripGeometry = true;
     }
     const bool skyrimHeader = o.version == V(20, 2, 0, 7) && o.userVersion == 12 &&
                               ((o.bsVersion >= 83 && o.bsVersion <= 100) || o.bsVersion == 130);
     if (skyrimHeader) {
         if (o.seGeometry) o.engine = NifEngine::SkyrimSe;
-        else if (o.legacyGeometry) o.engine = NifEngine::SkyrimLe;
+        else if (o.stripGeometry) o.engine = NifEngine::SkyrimLe;
         else o.engine = NifEngine::SkyrimEither;
     }
     return Status::Ok;

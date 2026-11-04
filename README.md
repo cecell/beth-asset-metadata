@@ -59,10 +59,14 @@ CMake: `FetchContent` or `add_subdirectory` this repo and link
   exactly like LE. The geometry block types decide. `seGeometry` is the
   BSTriShape family (`BSTriShape`, `BSDynamicTriShape`, `BSMeshLODTriShape`,
   `BSSubIndexTriShape`), which LE does not have. `legacyGeometry` is the
-  NiTri* family plus `bhkPackedNiTriStrips*`, the old style that SE still
-  loads (15 vanilla SSE meshes contain `NiTriStripsData`). `engine` is SE
-  when SE geometry is present, LE when only legacy geometry is, "either"
-  for a Skyrim header with neither. BS version 130 is Fallout 4 and some
+  NiTri* family plus `bhkPackedNiTriStrips*`; `stripGeometry` is
+  `NiTriStrips` / `NiTriStripsData`. `engine` follows Cathedral Assets
+  Optimizer's "necessary" mesh fixes (5.3.x): SE when SE geometry is
+  present, LE when the mesh has strips (SE cannot use them; CAO converts
+  them), and "either" for `NiTriShape` without strips or no geometry at all,
+  which both games load unchanged. Strips can also hide in a skin
+  partition: `read_nif_body` reports `skinStrips`, and `nif_engine(header,
+  body)` combines the two. BS version 130 is Fallout 4 and some
   SSE tools; it is accepted as a Skyrim header but is not evidence of SE.
 - **NIF textures.** `read_nif_textures` walks the header to the block
   sizes and reads only `BSShaderTextureSet` (every slot) and, below BS
