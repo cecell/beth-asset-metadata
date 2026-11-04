@@ -321,6 +321,23 @@ static void test_nif_geometry() {
     CHECK(body.shapes == 1 && body.shapesUnread == 1 && body.vertices == 0 && body.triangles == 0);
 }
 
+static void test_hkx() {
+    HkxInfo i;
+    const char* xml = "<?xml version=\"1.0\" encoding=\"ascii\"?>\n<hkpackfile classversion=\"8\">";
+    Bytes b(xml, xml + std::strlen(xml));
+    b.resize(0x40, ' ');
+    CHECK(read_hkx(b.data(), b.size(), i) == Status::Unsupported);
+    Bytes junk(0x40, 0x11);
+    CHECK(read_hkx(junk.data(), junk.size(), i) == Status::NotRecognized);
+    CHECK(read_hkx(junk.data(), 10, i) == Status::Truncated);
+    // A packfile header claiming 200 sections: refused before reading them.
+    Bytes pk(0x40, 0);
+    patch32(pk, 0, 0x57E0E057); patch32(pk, 4, 0x10C0C010); patch32(pk, 12, 8);
+    pk[16] = 8; pk[17] = 1; patch32(pk, 20, 200);
+    CHECK(read_hkx(pk.data(), pk.size(), i) == Status::Corrupt && i.pointerSize == 8 && i.fileVersion == 8);
+    CHECK(std::string(hkx_variable_type_name(3)) == "int32" && std::string(hkx_variable_type_name(200)) == "unknown");
+}
+
 static void test_lip() {
     Bytes b;
     put32(b, 1); put32(b, 132 * 23 + 28); put32(b, 13); put16(b, 23); put16(b, 3);
@@ -541,6 +558,7 @@ int main() {
     test_nif_geometry();
     test_audio();
     test_lip();
+    test_hkx();
     test_hostile();
     if (g_failures) {
         std::fprintf(stderr, "%d failure(s)\n", g_failures);

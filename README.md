@@ -10,6 +10,7 @@ CMake target `asset::metadata`, namespace `asset`.
 | `.tga` | width, height, bits per pixel, alpha bits, RLE, color-mapped, grayscale, origin | 18 bytes |
 | `.nif` | version line, binary version, user version, BS version, block count, block-type table, per-block type index, SE vs legacy geometry, Skyrim LE/SE engine guess | 64 KiB (more for huge meshes) |
 | `.nif` textures | every texture path a Skyrim mesh names (texture sets, effect shaders) | the whole file |
+| `.hkx` | packfile version, LE/SE pointer size, content kind; animations: duration, frames, tracks, annotations with times; behaviours: events, variables with types, character properties, clip animation names; characters: animation list | the whole file |
 | `.lip` | version, unit count (header only; the keyframe stream is not decoded) | 16 bytes |
 | `.wav` `.xwm` `.fuz` | container and payload, codec, channels, sample rate, bits, bit rate, data size, duration, FUZ lip block size | 64 KiB |
 
@@ -82,6 +83,22 @@ CMake: `FetchContent` or `add_subdirectory` this repo and link
   every other block is skipped by its recorded size. Paths are returned as
   stored, so normalise them yourself (case, slashes, a missing `textures\`
   prefix). Needs the whole file: a cut file is `Truncated`.
+- **HKX.** Skyrim's packfiles (hk_2010.2.0-r1, file version 8; 3 sections:
+  `__classnames__`, `__types__` (empty), `__data__`) don't describe their own
+  class layouts, so `read_hkx` reads only objects at offsets measured on
+  real files, the same logic for 32-bit (LE) and 64-bit (SE).
+  - Class names end where the 0x09 separator is missing; a signature byte
+    can be 0xFF.
+  - Virtual fixups give each object's class.
+  - Animations take the first hkaSplineCompressed/InterleavedUncompressed
+    object. Annotations sit per transform track; empty texts are padding;
+    a few mods put times past the duration (`annotationPastEnd`).
+  - Behaviour graphs: hkbBehaviorGraphStringData (events, variables,
+    character properties), hkbBehaviorGraphData (variable types, 6-byte
+    infos) and every hkbClipGenerator's animation name.
+  - Over the 49,800 packfiles of one modded install: all read (49,658
+    animations, 79,737 annotations, 82 behaviours, 12 characters, 10
+    projects, 34 skeletons). XML and tagfile .hkx (421) are `Unsupported`.
 - **LIP.** No public specification exists; the header was measured on
   14,837 loose files and the LIP blocks inside FUZ files. u32 version (1),
   u32 size field (always `132 * units + 28`), u32 constant 13, then a u16

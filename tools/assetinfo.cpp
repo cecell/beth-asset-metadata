@@ -31,7 +31,8 @@ std::string lower_ext(const std::string& name) {
 }
 
 bool is_asset_ext(const std::string& e) {
-    return e == ".dds" || e == ".tga" || e == ".nif" || e == ".wav" || e == ".xwm" || e == ".fuz" || e == ".lip";
+    return e == ".dds" || e == ".tga" || e == ".nif" || e == ".wav" || e == ".xwm" || e == ".fuz" || e == ".lip" ||
+           e == ".hkx";
 }
 
 void print_dds(const DdsInfo& i) {
@@ -73,6 +74,25 @@ int cmd_file(const fs::path& p) {
         TgaInfo i;
         s = probe_tga(p, i);
         if (s == Status::Ok) print_tga(i);
+    } else if (ext == ".hkx") {
+        std::vector<uint8_t> buf;
+        HkxInfo i;
+        s = read_prefix(p, size_t{256} << 20, buf);
+        if (s == Status::Ok) s = read_hkx(buf.data(), buf.size(), i);
+        if (s == Status::Ok) {
+            std::printf("hkx  %s  %u-bit  %s  classes %zu\n", i.version.c_str(), i.pointerSize * 8, to_string(i.content), i.classes.size());
+            if (i.hasAnimation)
+                std::printf("  animation  %s  %.4f s  frames %d  tracks %d+%d  annotations %zu\n", i.animationClass.c_str(),
+                            i.duration, i.frameCount, i.transformTracks, i.floatTracks, i.annotations.size());
+            for (const auto& a : i.annotations) std::printf("    %.4f  %s\n", a.time, a.text.c_str());
+            if (!i.variables.empty() || !i.events.empty())
+                std::printf("  behavior  events %zu  variables %zu  properties %zu  clips %zu\n", i.events.size(),
+                            i.variables.size(), i.characterProperties.size(), i.clipAnimations.size());
+            for (size_t k = 0; k < i.variables.size() && k < 400; ++k)
+                std::printf("    var %s : %s\n", i.variables[k].c_str(),
+                            k < i.variableTypes.size() ? hkx_variable_type_name(i.variableTypes[k]) : "?");
+            if (!i.animationNames.empty()) std::printf("  character  animations %zu\n", i.animationNames.size());
+        }
     } else if (ext == ".lip") {
         std::vector<uint8_t> buf;
         LipInfo i;
@@ -146,6 +166,16 @@ void check_buffer(const std::string& ext, const uint8_t* d, size_t n, const std:
             s = read_tga(d, n, i);
             if (s == Status::Ok) ++t.notes[std::to_string(i.bitsPerPixel) + " bpp" + (i.rle ? " rle" : "")];
         }
+    } else if (ext == ".hkx") {
+        HkxInfo i;
+        s = read_hkx(d, n, i);
+        if (s == Status::Ok) {
+            ++t.notes[std::string("content ") + to_string(i.content) + " " + std::to_string(i.pointerSize * 8) + "-bit"];
+            t.notes["annotations " + (i.hasAnimation ? i.animationClass : std::string("-"))] += i.annotations.size();
+            t.notes["behavior variables"] += i.variables.size();
+            if (i.annotationPastEnd) ++t.notes["annotation past the end"];
+            if (!i.variables.empty() && i.variableTypes.size() != i.variables.size()) note(t, "variable types count differs", where);
+        }
     } else if (ext == ".lip") {
         LipInfo i;
         s = read_lip(d, n, i);
@@ -186,7 +216,7 @@ void check_buffer(const std::string& ext, const uint8_t* d, size_t n, const std:
 
 void check_loose(const fs::path& p, const std::string& ext) {
     std::vector<uint8_t> buf;
-    const size_t cap = ext == ".dds" ? kDdsProbeBytes : ext == ".tga" ? kDdsProbeBytes : (size_t{4} << 20);
+    const size_t cap = ext == ".dds" ? kDdsProbeBytes : ext == ".tga" ? kDdsProbeBytes : ext == ".hkx" ? (size_t{256} << 20) : (size_t{4} << 20);
     if (read_prefix(p, cap, buf) != Status::Ok) {
         ++g_tally[ext].status[Status::CannotOpen];
         return;

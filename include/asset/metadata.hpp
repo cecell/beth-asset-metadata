@@ -204,6 +204,56 @@ struct LipInfo {
 };
 Status read_lip(const uint8_t* data, size_t len, LipInfo& out) noexcept;
 
+// ------------------------------------------------------------------ HKX
+
+// Havok packfiles as Skyrim ships them (hk_2010.2.0-r1, file version 8;
+// pointer size 4 = LE, 8 = SE). Reads the header, sections, class names and
+// fixups, then a few objects at offsets measured on ~50,000 real files:
+// animations (duration, frames, tracks, annotations such as "weaponSwing"
+// or "SoundPlay.FSTWalk" with their times), behaviour graphs (event names,
+// variable names and types, character properties, clip generators'
+// animation names) and characters (their animation list). Needs the whole
+// file. XML and tagfile .hkx are Unsupported.
+enum class HkxContent { Unknown, Animation, Behavior, Character, Project, Skeleton, Other };
+const char* to_string(HkxContent c) noexcept;
+const char* hkx_variable_type_name(uint8_t type) noexcept;  // 0 bool, 3 int32, 4 real, 5 pointer, ...
+
+struct HkxAnnotation {
+    float time = 0;     // seconds; can exceed the duration in a few mod files
+    std::string text;   // "weaponSwing", "SoundPlay.FSTWalk", "PIE.@SGVF|..."
+    uint32_t track = 0; // transform track (bone); 0 for nearly all
+};
+
+struct HkxInfo {
+    std::string version;        // "hk_2010.2.0-r1"
+    uint32_t fileVersion = 0;   // 8
+    uint32_t pointerSize = 0;   // 4 = Skyrim LE (32-bit), 8 = SE (64-bit)
+    bool littleEndian = true;
+    uint32_t sectionCount = 0;
+    HkxContent content = HkxContent::Unknown;
+    std::vector<std::string> classes;  // distinct object classes
+    // The first animation (hkaSplineCompressedAnimation / InterleavedUncompressed).
+    bool hasAnimation = false;
+    std::string animationClass;
+    int32_t animationType = 0;     // 5 = spline compressed
+    float duration = 0;            // seconds
+    int32_t frameCount = -1;       // spline only; -1 = not stored
+    int32_t blockCount = -1;
+    int32_t transformTracks = 0;
+    int32_t floatTracks = 0;
+    std::vector<HkxAnnotation> annotations;  // empty texts skipped
+    bool annotationPastEnd = false;
+    // Behaviour graph (hkbBehaviorGraphStringData / hkbBehaviorGraphData).
+    std::vector<std::string> events;
+    std::vector<std::string> variables;
+    std::vector<uint8_t> variableTypes;      // parallel to variables when both are present
+    std::vector<std::string> characterProperties;
+    std::vector<std::string> clipAnimations; // hkbClipGenerator animationName ("Animations\MT_Jump.hkx")
+    // Character (hkbCharacterStringData).
+    std::vector<std::string> animationNames;
+};
+Status read_hkx(const uint8_t* data, size_t len, HkxInfo& out) noexcept;
+
 // ---------------------------------------------------------------- files
 
 // Reads up to maxBytes from the start of the file, sharing read/write/delete.
