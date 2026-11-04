@@ -9,6 +9,7 @@ CMake target `asset::metadata`, namespace `asset`.
 | `.dds` | width, height, depth, mipmaps, array size, format (BC1..BC7, RGBA8 variants, 16-bit, float), DXGI id, FourCC, sRGB, alpha, cubemap, volume | 148 bytes |
 | `.tga` | width, height, bits per pixel, alpha bits, RLE, color-mapped, grayscale, origin | 18 bytes |
 | `.nif` | version line, binary version, user version, BS version, block count, block-type table, per-block type index, SE vs legacy geometry, Skyrim LE/SE engine guess | 64 KiB (more for huge meshes) |
+| `.nif` textures | every texture path a Skyrim mesh names (texture sets, effect shaders) | the whole file |
 | `.wav` `.xwm` `.fuz` | container and payload, codec, channels, sample rate, bits, bit rate, data size, duration, FUZ lip block size | 64 KiB |
 
 Every reader takes a byte buffer, so it works on a file prefix or on bytes
@@ -63,6 +64,12 @@ CMake: `FetchContent` or `add_subdirectory` this repo and link
   when SE geometry is present, LE when only legacy geometry is, "either"
   for a Skyrim header with neither. BS version 130 is Fallout 4 and some
   SSE tools; it is accepted as a Skyrim header but is not evidence of SE.
+- **NIF textures.** `read_nif_textures` walks the header to the block
+  sizes and reads only `BSShaderTextureSet` (every slot) and, below BS
+  version 130, `BSEffectShaderProperty` (source and greyscale textures);
+  every other block is skipped by its recorded size. Paths are returned as
+  stored, so normalise them yourself (case, slashes, a missing `textures\`
+  prefix). Needs the whole file: a cut file is `Truncated`.
 - **Audio.** FUZ payloads are usually xWMA, but plain WAV happens too: of
   280,715 loose FUZ files on one modded install, 569 wrapped PCM or IEEE
   float WAV. Files that are not RIFF at all (a mod shipped MP3s named

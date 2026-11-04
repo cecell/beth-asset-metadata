@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(asset_metadata VERSION 0.1.0 LANGUAGES CXX)
+project(asset_metadata VERSION 0.2.0 LANGUAGES CXX)
 
 option(ASSET_METADATA_BUILD_TOOLS "Build the assetinfo command line program" ${PROJECT_IS_TOP_LEVEL})
 option(ASSET_METADATA_BUILD_TESTS "Build and register the unit tests" ${PROJECT_IS_TOP_LEVEL})
@@ -9,6 +9,7 @@ add_library(asset_metadata STATIC
     src/dds.cpp
     src/tga.cpp
     src/nif.cpp
+    src/nif_textures.cpp
     src/audio.cpp
     src/file.cpp)
 add_library(asset::metadata ALIAS asset_metadata)

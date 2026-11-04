@@ -203,6 +203,67 @@ static Bytes nif(uint32_t version, uint32_t userVersion, uint32_t bsVersion, std
     return b;
 }
 
+// A Skyrim NIF with a texture set and an effect shader, block bodies laid
+// out as Skyrim writes them.
+static Bytes textured_nif() {
+    Bytes set;
+    put32(set, 3);
+    sized_string(set, "textures\\armor\\a.dds");
+    sized_string(set, "");
+    sized_string(set, "Armor\\A_n.dds");
+    Bytes fx;
+    for (uint32_t v : {0u, 0u, 0xFFFFFFFFu, 0u, 0u}) put32(fx, v);  // name, extra data, controller, flags 1, 2
+    for (int i = 0; i < 4; ++i) put32(fx, 0);                    // UV offset and scale
+    sized_string(fx, "effects\\glow.dds");
+    for (int i = 0; i < 4; ++i) put8(fx, 0);                     // clamp, lighting, env LOD, unused
+    for (int i = 0; i < 4 + 4 + 2; ++i) put32(fx, 0);            // falloff, emissive color, multiple, depth
+    sized_string(fx, "effects\\gradient.dds");
+    Bytes b;
+    const std::string line = "Gamebryo File Format, Version 20.2.0.7\n";
+    b.insert(b.end(), line.begin(), line.end());
+    put32(b, 0x14020007); put8(b, 1); put32(b, 12); put32(b, 3);
+    put32(b, 100);
+    short_string(b, "a"); short_string(b, "p"); short_string(b, "e");
+    put16(b, 3);
+    sized_string(b, "NiNode"); sized_string(b, "BSShaderTextureSet"); sized_string(b, "BSEffectShaderProperty");
+    put16(b, 0); put16(b, 1); put16(b, 2);
+    put32(b, 4); put32(b, static_cast<uint32_t>(set.size())); put32(b, static_cast<uint32_t>(fx.size()));
+    put32(b, 0); put32(b, 0); put32(b, 0);  // strings, max length, groups
+    put32(b, 0);                            // the NiNode body (4 bytes)
+    b.insert(b.end(), set.begin(), set.end());
+    b.insert(b.end(), fx.begin(), fx.end());
+    return b;
+}
+
+static void test_nif_textures() {
+    Bytes b = textured_nif();
+    std::vector<NifTexture> t;
+    CHECK(read_nif_textures(b.data(), b.size(), t) == Status::Ok);
+    CHECK(t.size() == 4);
+    if (t.size() == 4) {
+        CHECK(t[0].block == "BSShaderTextureSet" && t[0].slot == 0 && t[0].path == "textures\\armor\\a.dds");
+        CHECK(t[1].slot == 2 && t[1].path == "Armor\\A_n.dds");  // as stored; empty slot 1 left out
+        CHECK(t[2].block == "BSEffectShaderProperty" && t[2].slot == 0 && t[2].path == "effects\\glow.dds");
+        CHECK(t[3].slot == 1 && t[3].path == "effects\\gradient.dds");
+    }
+    // Every prefix is cut somewhere: never Ok, never a crash, nothing returned.
+    int cut = 0;
+    for (size_t k = 0; k < b.size(); ++k) {
+        std::vector<NifTexture> p;
+        const Status s = read_nif_textures(b.data(), k, p);
+        if (s != Status::Ok && p.empty()) ++cut;
+    }
+    CHECK(cut == static_cast<int>(b.size()));
+    // The greyscale path's length far past the block: that block stops there,
+    // the file stays readable and the other textures come back.
+    Bytes bad = textured_nif();
+    bad[bad.size() - 24] = 0xFF;  // low byte of the last string's length
+    CHECK(read_nif_textures(bad.data(), bad.size(), t) == Status::Ok && t.size() == 3);
+    // Not Skyrim.
+    Bytes ob = nif(0x14000005, 11, 11, {"NiNode"}, {0});
+    CHECK(read_nif_textures(ob.data(), ob.size(), t) == Status::Unsupported && t.empty());
+}
+
 static void test_nif() {
     NifInfo i;
     auto b = nif(0x14020007, 12, 130, {"NiNode", "BSTriShape", "BSLightingShaderProperty"}, {0, 1, 2, 1});
@@ -369,6 +430,7 @@ int main() {
     test_dds();
     test_tga();
     test_nif();
+    test_nif_textures();
     test_audio();
     test_hostile();
     if (g_failures) {

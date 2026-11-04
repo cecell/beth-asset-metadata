@@ -118,6 +118,20 @@ std::string nif_version_string(uint32_t version);  // 0x14020007 -> "20.2.0.7"
 constexpr size_t kNifProbeBytes = size_t{64} << 10;
 Status read_nif(const uint8_t* data, size_t len, NifInfo& out) noexcept;
 
+// The texture paths a Skyrim mesh names: every slot of each
+// BSShaderTextureSet, and the source and greyscale textures of each
+// BSEffectShaderProperty (meshes below BS version 130). Needs the WHOLE file
+// (texture blocks can sit anywhere); a cut file is Truncated. Other games'
+// NIFs are Unsupported. Paths come back as stored: case, slashes and any
+// "textures\" prefix untouched. Empty slots are left out.
+struct NifTexture {
+    std::string block;  // "BSShaderTextureSet" or "BSEffectShaderProperty"
+    uint32_t slot = 0;  // texture set: slot index; effect shader: 0 source, 1 greyscale
+    std::string path;
+};
+constexpr size_t kNifMaxBytes = size_t{64} << 20;  // probe_nif_textures refuses bigger files
+Status read_nif_textures(const uint8_t* data, size_t len, std::vector<NifTexture>& out) noexcept;
+
 // ---------------------------------------------------------------- audio
 
 enum class AudioContainer { Unknown, Wav, Xwm, Fuz };
@@ -157,6 +171,7 @@ Status read_prefix(const std::filesystem::path& path, size_t maxBytes, std::vect
 Status probe_dds(const std::filesystem::path& path, DdsInfo& out) noexcept;
 Status probe_tga(const std::filesystem::path& path, TgaInfo& out) noexcept;
 Status probe_nif(const std::filesystem::path& path, NifInfo& out) noexcept;
+Status probe_nif_textures(const std::filesystem::path& path, std::vector<NifTexture>& out) noexcept;
 Status probe_audio(const std::filesystem::path& path, AudioInfo& out) noexcept;
 
 }  // namespace asset

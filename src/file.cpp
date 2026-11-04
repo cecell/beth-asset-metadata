@@ -116,6 +116,15 @@ Status probe_nif(const std::filesystem::path& path, NifInfo& out) noexcept {
     return probe(path, kNifProbeBytes, size_t{4} << 20, out, read_nif);
 }
 
+Status probe_nif_textures(const std::filesystem::path& path, std::vector<NifTexture>& out) noexcept {
+    out.clear();
+    std::vector<uint8_t> buf;
+    const Status s = read_prefix(path, kNifMaxBytes + 1, buf);
+    if (s != Status::Ok) return s;
+    if (buf.size() > kNifMaxBytes) return Status::Unsupported;
+    return read_nif_textures(buf.data(), buf.size(), out);
+}
+
 Status probe_audio(const std::filesystem::path& path, AudioInfo& out) noexcept {
     // A FUZ lip block or a long XWM packet table can push the fields past
     // the first probe; retry once with a bigger one in those cases too.

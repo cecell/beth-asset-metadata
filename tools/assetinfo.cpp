@@ -76,7 +76,15 @@ int cmd_file(const fs::path& p) {
     } else {
         switch (detect(head.data(), head.size())) {
             case Kind::Dds: { DdsInfo i; s = probe_dds(p, i); if (s == Status::Ok) print_dds(i); break; }
-            case Kind::Nif: { NifInfo i; s = probe_nif(p, i); if (s == Status::Ok) print_nif(i); break; }
+            case Kind::Nif: {
+                NifInfo i;
+                s = probe_nif(p, i);
+                if (s == Status::Ok) print_nif(i);
+                std::vector<NifTexture> tex;
+                if (s == Status::Ok && i.engine != NifEngine::Unknown && probe_nif_textures(p, tex) == Status::Ok)
+                    for (const auto& t : tex) std::printf("  texture  %s[%u]  %s\n", t.block.c_str(), t.slot, t.path.c_str());
+                break;
+            }
             case Kind::Fuz: case Kind::Wav: case Kind::Xwm: { AudioInfo i; s = probe_audio(p, i); if (s == Status::Ok) print_audio(i); break; }
             default: s = Status::NotRecognized;
         }
