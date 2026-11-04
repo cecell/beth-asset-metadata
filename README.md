@@ -69,6 +69,12 @@ CMake: `FetchContent` or `add_subdirectory` this repo and link
   partition: `read_nif_body` reports `skinStrips`, and `nif_engine(header,
   body)` combines the two. BS version 130 is Fallout 4 and some
   SSE tools; it is accepted as a Skyrim header but is not evidence of SE.
+- **NIF geometry.** `read_nif_body` totals vertices and triangles over every
+  shape. SE shapes check the stored data size against the counts; skinned SE
+  shapes keep their vertices and triangles in the skin partition, found
+  through the shape's skin instance. LE `NiTriShapeData` / `NiTriStripsData`
+  must parse to exactly the block end. A shape that fails its check is
+  counted in `shapesUnread` instead (0 in a sample of 600 modded meshes).
 - **NIF textures.** `read_nif_textures` walks the header to the block
   sizes and reads only `BSShaderTextureSet` (every slot) and, below BS
   version 130, `BSEffectShaderProperty` (source and greyscale textures);

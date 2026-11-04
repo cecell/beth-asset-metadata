@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(asset_metadata VERSION 0.3.1 LANGUAGES CXX)
+project(asset_metadata VERSION 0.4.0 LANGUAGES CXX)
 
 option(ASSET_METADATA_BUILD_TOOLS "Build the assetinfo command line program" ${PROJECT_IS_TOP_LEVEL})
 option(ASSET_METADATA_BUILD_TESTS "Build and register the unit tests" ${PROJECT_IS_TOP_LEVEL})

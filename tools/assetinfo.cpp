@@ -80,9 +80,15 @@ int cmd_file(const fs::path& p) {
                 NifInfo i;
                 s = probe_nif(p, i);
                 if (s == Status::Ok) print_nif(i);
-                std::vector<NifTexture> tex;
-                if (s == Status::Ok && i.engine != NifEngine::Unknown && probe_nif_textures(p, tex) == Status::Ok)
-                    for (const auto& t : tex) std::printf("  texture  %s[%u]  %s\n", t.block.c_str(), t.slot, t.path.c_str());
+                std::vector<uint8_t> whole;
+                NifBody body;
+                if (s == Status::Ok && i.engine != NifEngine::Unknown && read_prefix(p, kNifMaxBytes, whole) == Status::Ok &&
+                    read_nif_body(whole.data(), whole.size(), body) == Status::Ok) {
+                    std::printf("  geometry  %u shapes  %llu vertices  %llu triangles%s\n", body.shapes,
+                                static_cast<unsigned long long>(body.vertices), static_cast<unsigned long long>(body.triangles),
+                                body.shapesUnread ? "  (some shapes unread)" : "");
+                    for (const auto& t : body.textures) std::printf("  texture  %s[%u]  %s\n", t.block.c_str(), t.slot, t.path.c_str());
+                }
                 break;
             }
             case Kind::Fuz: case Kind::Wav: case Kind::Xwm: { AudioInfo i; s = probe_audio(p, i); if (s == Status::Ok) print_audio(i); break; }
@@ -143,6 +149,11 @@ void check_buffer(const std::string& ext, const uint8_t* d, size_t n, const std:
             if (i.seGeometry) ++t.notes["se geometry"];
             if (i.legacyGeometry) ++t.notes["legacy geometry"];
             if (i.seGeometry && i.legacyGeometry) ++t.notes["both geometry styles"];
+            NifBody body;
+            if (!bounded && read_nif_body(d, n, body) == Status::Ok) {  // whole file in hand
+                t.notes["shapes"] += body.shapes;
+                if (body.shapesUnread) note(t, "geometry: " + std::to_string(body.shapesUnread) + " shape(s) unread", where);
+            }
         }
     } else {
         AudioInfo i;

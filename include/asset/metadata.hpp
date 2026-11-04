@@ -144,6 +144,15 @@ Status read_nif_textures(const uint8_t* data, size_t len, std::vector<NifTexture
 struct NifBody {
     std::vector<NifTexture> textures;
     bool skinStrips = false;  // a skin partition with strips: SE cannot use it (CAO converts it)
+    // Geometry totals over every shape: the BSTriShape family (SE) and
+    // NiTriShapeData / NiTriStripsData (LE style). A block counts only when
+    // its layout checks out (SE: the stored data size matches the counts;
+    // LE: the parse ends exactly at the block end); others are in
+    // shapesUnread, so the totals are exact when shapesUnread is 0.
+    uint32_t shapes = 0;
+    uint32_t shapesUnread = 0;
+    uint64_t vertices = 0;
+    uint64_t triangles = 0;
 };
 Status read_nif_body(const uint8_t* data, size_t len, NifBody& out) noexcept;
 // The engine from the header and the body together (skin strips => SkyrimLe).

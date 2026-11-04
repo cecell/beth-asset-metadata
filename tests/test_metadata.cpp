@@ -280,6 +280,47 @@ static void test_nif_skin_strips() {
     }
 }
 
+// A bs 100 NIF with one BSTriShape holding `verts` 16-byte vertices and
+// `tris` triangles inline; `dataSize` overrides the stored size (damage).
+static Bytes trishape_nif(uint16_t verts, uint16_t tris, int64_t dataSize = -1) {
+    Bytes s;
+    put32(s, 0); put32(s, 0); put32(s, 0xFFFFFFFF);     // name, extra data, controller
+    put32(s, 14);                                       // flags
+    for (int i = 0; i < 3 + 9 + 1; ++i) put32(s, 0);    // translation, rotation, scale
+    put32(s, 0xFFFFFFFF);                               // collision
+    for (int i = 0; i < 4; ++i) put32(s, 0);            // bounding sphere
+    for (int i = 0; i < 3; ++i) put32(s, 0xFFFFFFFF);   // skin, shader, alpha
+    put32(s, 4); put32(s, 0);                           // vertex desc: 4 * 4 = 16 bytes per vertex
+    put16(s, tris); put16(s, verts);
+    const uint32_t real = verts * 16u + tris * 6u;
+    put32(s, dataSize < 0 ? real : static_cast<uint32_t>(dataSize));
+    for (uint32_t i = 0; i < real; ++i) put8(s, 0);
+    Bytes b;
+    const std::string line = "Gamebryo File Format, Version 20.2.0.7\n";
+    b.insert(b.end(), line.begin(), line.end());
+    put32(b, 0x14020007); put8(b, 1); put32(b, 12); put32(b, 2);
+    put32(b, 100);
+    short_string(b, "a"); short_string(b, "p"); short_string(b, "e");
+    put16(b, 2);
+    sized_string(b, "BSFadeNode"); sized_string(b, "BSTriShape");
+    put16(b, 0); put16(b, 1);
+    put32(b, 4); put32(b, static_cast<uint32_t>(s.size()));
+    put32(b, 0); put32(b, 0); put32(b, 0);
+    put32(b, 0);  // the node body (not read)
+    b.insert(b.end(), s.begin(), s.end());
+    return b;
+}
+
+static void test_nif_geometry() {
+    NifBody body;
+    Bytes b = trishape_nif(3, 1);
+    CHECK(read_nif_body(b.data(), b.size(), body) == Status::Ok);
+    CHECK(body.shapes == 1 && body.shapesUnread == 0 && body.vertices == 3 && body.triangles == 1);
+    b = trishape_nif(3, 1, 999);  // stored size disagrees with the counts: not counted
+    CHECK(read_nif_body(b.data(), b.size(), body) == Status::Ok);
+    CHECK(body.shapes == 1 && body.shapesUnread == 1 && body.vertices == 0 && body.triangles == 0);
+}
+
 static void test_nif_textures() {
     Bytes b = textured_nif();
     std::vector<NifTexture> t;
@@ -483,6 +524,7 @@ int main() {
     test_nif();
     test_nif_textures();
     test_nif_skin_strips();
+    test_nif_geometry();
     test_audio();
     test_hostile();
     if (g_failures) {
