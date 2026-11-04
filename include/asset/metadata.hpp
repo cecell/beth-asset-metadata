@@ -116,7 +116,7 @@ struct NifInfo {
     std::vector<uint16_t> blockTypeIndex;  // per block, index into blockTypes
     bool seGeometry = false;      // BSTriShape / BSDynamicTriShape / BSMeshLODTriShape / BSSubIndexTriShape present
     bool legacyGeometry = false;  // NiTriShape(Data) / NiTriStrips(Data) / bhkPackedNiTriStrips* present
-    bool stripGeometry = false;   // NiTriStrips / NiTriStripsData present (shapes, not collision)
+    bool stripGeometry = false;   // a NiTriStrips shape (orphan NiTriStripsData blocks do not count)
     NifEngine engine = NifEngine::Unknown;  // from the header's block types (see NifEngine)
 };
 

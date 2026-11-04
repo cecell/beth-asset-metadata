@@ -322,6 +322,8 @@ static void test_nif() {
     b = nif(0x14020007, 12, 100, {"NiNode", "NiTriShape", "NiTriStrips"}, {0, 1, 2});
     CHECK(read_nif(b.data(), b.size(), i) == Status::Ok && i.engine == NifEngine::SkyrimLe && !i.seGeometry && i.legacyGeometry &&
           i.stripGeometry);
+    b = nif(0x14020007, 12, 100, {"NiNode", "NiTriStripsData"}, {0, 1});  // orphan strips data: not a strips shape
+    CHECK(read_nif(b.data(), b.size(), i) == Status::Ok && i.engine == NifEngine::SkyrimEither && !i.stripGeometry);
     b = nif(0x14020007, 12, 83, {"NiNode", "NiTriShape", "NiTriShapeData"}, {0, 1, 2});  // LE mesh SE loads as is
     CHECK(read_nif(b.data(), b.size(), i) == Status::Ok && i.engine == NifEngine::SkyrimEither && i.legacyGeometry &&
           !i.stripGeometry);

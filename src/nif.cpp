@@ -145,7 +145,9 @@ Status parse(const uint8_t* d, size_t n, NifInfo& o) {
     for (const std::string& t : o.blockTypes) {
         for (const char* s : kSeGeometry) if (t == s) o.seGeometry = true;
         for (const char* s : kLegacyGeometry) if (t == s) o.legacyGeometry = true;
-        if (t == "NiTriStrips" || t == "NiTriStripsData") o.stripGeometry = true;
+        // The shape, as CAO checks shapes: vanilla SSE meshes carry orphan
+        // NiTriStripsData blocks and load fine.
+        if (t == "NiTriStrips") o.stripGeometry = true;
     }
     const bool skyrimHeader = o.version == V(20, 2, 0, 7) && o.userVersion == 12 &&
                               ((o.bsVersion >= 83 && o.bsVersion <= 100) || o.bsVersion == 130);

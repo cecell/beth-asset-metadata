@@ -59,8 +59,9 @@ CMake: `FetchContent` or `add_subdirectory` this repo and link
   exactly like LE. The geometry block types decide. `seGeometry` is the
   BSTriShape family (`BSTriShape`, `BSDynamicTriShape`, `BSMeshLODTriShape`,
   `BSSubIndexTriShape`), which LE does not have. `legacyGeometry` is the
-  NiTri* family plus `bhkPackedNiTriStrips*`; `stripGeometry` is
-  `NiTriStrips` / `NiTriStripsData`. `engine` follows Cathedral Assets
+  NiTri* family plus `bhkPackedNiTriStrips*`; `stripGeometry` is a
+  `NiTriStrips` shape (15 vanilla SSE meshes carry orphan `NiTriStripsData`
+  blocks and load fine, so data blocks alone do not count). `engine` follows Cathedral Assets
   Optimizer's "necessary" mesh fixes (5.3.x): SE when SE geometry is
   present, LE when the mesh has strips (SE cannot use them; CAO converts
   them), and "either" for `NiTriShape` without strips or no geometry at all,
